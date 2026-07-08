@@ -1,0 +1,4 @@
+# Attention Is All You Need
+
+We propose a new simple network architecture, the Transformer, based solely on
+attention mechanisms, dispensing with recurrence and convolutions entirely.

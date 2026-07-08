@@ -1,0 +1,16 @@
+{
+  "name": "@llmwiki/cli",
+  "version": "0.1.0",
+  "description": "Thin CLI front for the LLM Wiki engine.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "llmwiki": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@llmwiki/core": "*"
+  }
+}

@@ -1,0 +1,87 @@
+import { describe, expect, it } from "vitest"
+import type { Frontmatter, Page, SourceRef } from "./types.js"
+import { buildGraph, extractWikilinks } from "./graph.js"
+
+function mkFm(partial: Partial<Frontmatter>): Frontmatter {
+  return {
+    type: "concept",
+    title: partial.title ?? "t",
+    tags: partial.tags ?? ["a", "b"],
+    related: partial.related ?? [],
+    sources: partial.sources ?? [],
+    created: "2026-01-01",
+    updated: "2026-01-01",
+    confidence: partial.confidence,
+  }
+}
+
+function page(id: string, body = "", fm: Partial<Frontmatter> = {}): Page {
+  return { id, path: `wiki/${id}.md`, fm: fm.title || fm.related?.length || fm.sources?.length ? mkFm(fm) : null, body, raw: body }
+}
+
+describe("extractWikilinks", () => {
+  it("extracts bare wikilink targets", () => {
+    expect(extractWikilinks("see [[foo]] and [[bar-baz]]")).toEqual(["foo", "bar-baz"])
+  })
+
+  it("strips a trailing alias and .md extension", () => {
+    expect(extractWikilinks("[[concepts/attention.md|Attention]]")).toEqual(["concepts/attention"])
+  })
+
+  it("returns an empty array when there are no wikilinks", () => {
+    expect(extractWikilinks("plain text, no links")).toEqual([])
+  })
+
+  it("deduplicates while preserving order", () => {
+    expect(extractWikilinks("[[foo]] again [[foo]] and [[bar]]")).toEqual(["foo", "bar"])
+  })
+})
+
+describe("buildGraph", () => {
+  it("creates a links_to edge from a body wikilink and sets both degrees", () => {
+    const g = buildGraph([page("a", "see [[b]]"), page("b")], [])
+    const edge = g.edges.find((e) => e.source === "a" && e.target === "b")
+    expect(edge?.relation).toBe("links_to")
+    expect(g.nodes.get("a")?.degree).toBe(1)
+    expect(g.nodes.get("b")?.degree).toBe(1)
+  })
+
+  it("creates a links_to edge from related frontmatter", () => {
+    const g = buildGraph([page("a", "", { related: ["b"] }), page("b")], [])
+    expect(g.edges.some((e) => e.source === "a" && e.target === "b" && e.relation === "links_to")).toBe(true)
+  })
+
+  it("creates a cites edge from sources frontmatter and carries confidence", () => {
+    const src: SourceRef = { id: "ml/paper.pdf", path: "raw/sources/ml/paper.pdf", title: "Paper" }
+    const g = buildGraph([page("a", "", { sources: ["ml/paper.pdf"], confidence: "EXTRACTED" })], [src])
+    const edge = g.edges.find((e) => e.source === "a" && e.relation === "cites")
+    expect(edge?.target).toBe("ml/paper.pdf")
+    expect(edge?.confidence).toBe("EXTRACTED")
+    expect(g.nodes.get("ml/paper.pdf")?.type).toBe("source")
+  })
+
+  it("marks a page with no real connections as degree 0 (orphan)", () => {
+    const g = buildGraph([page("lonely")], [])
+    expect(g.nodes.get("lonely")?.degree).toBe(0)
+  })
+
+  it("deduplicates edges when a target is linked both in related and body", () => {
+    const g = buildGraph([page("a", "[[b]]", { related: ["b"] }), page("b")], [])
+    const ab = g.edges.filter((e) => e.source === "a" && e.target === "b" && e.relation === "links_to")
+    expect(ab.length).toBe(1)
+  })
+
+  it("records a dangling link as an edge but does not inflate the source's real degree", () => {
+    const g = buildGraph([page("a", "[[ghost]]")], [])
+    expect(g.edges.some((e) => e.source === "a" && e.target === "ghost")).toBe(true)
+    expect(g.nodes.get("a")?.degree).toBe(0)
+    expect(g.nodes.has("ghost")).toBe(false)
+  })
+
+  it("bumps dataVersion on each rebuild", () => {
+    const pages = [page("a", "[[b]]"), page("b")]
+    const g1 = buildGraph(pages, [])
+    const g2 = buildGraph(pages, [])
+    expect(g2.dataVersion).toBeGreaterThan(g1.dataVersion)
+  })
+})
