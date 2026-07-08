@@ -13,6 +13,9 @@ import { computeContextBudget } from "./context-budget.js"
 import { retrieve } from "./retrieval.js"
 import { impactSurface } from "./staleness.js"
 import { connectedComponents, findHubs, findKnowledgeGaps } from "./graph-insights.js"
+import { scoreHealth, type HealthScorecard } from "./eval.js"
+import { buildProposePrompt, buildRefreshPrompt, planMaintenance, type MaintenancePlan } from "./maintain.js"
+import { parseIngestBlocks } from "./ingest-parser.js"
 import type { Frontmatter, Graph, LlmClient, Page, SourceRef } from "./types.js"
 
 /**
@@ -28,6 +31,20 @@ import type { Frontmatter, Graph, LlmClient, Page, SourceRef } from "./types.js"
  */
 
 const WIKI_TYPES = ["entities", "concepts", "sources", "queries", "comparisons", "synthesis", "archive"]
+
+interface WikiState {
+  healthHistory: Array<{ at: string; composite: number }>
+  lastMaintainedAt: string | null
+  signals: { staleCount: number; openIssues: number; proposedPages: number }
+}
+
+export interface MaintainResult {
+  ran: boolean
+  reason?: string
+  plan: MaintenancePlan
+  written?: number
+  staleCleared?: number
+}
 
 export interface WikiOptions {
   llm?: LlmClient
@@ -129,10 +146,7 @@ export class Wiki {
     const blocks = await runIngest(source, ctx, this.opts.llm)
 
     for (const f of blocks.files) {
-      const rel = f.path.replace(/^\/+/, "")
-      const target = rel.startsWith("wiki/") ? rel : `wiki/${rel}`
-      await fs.mkdir(path.dirname(path.join(this.root, target)), { recursive: true })
-      await fs.writeFile(path.join(this.root, target), f.content.endsWith("\n") ? f.content : f.content + "\n", "utf8")
+      await this.writeGenerated(f.path, f.content)
     }
     await this.appendLog(`ingest | ${path.basename(abs)} — ${blocks.files.length} page(s)`)
     await this.reindex()
@@ -144,7 +158,7 @@ export class Wiki {
     if (!this.opts.llm) throw new Error("ask requires an LLM client")
     await this.reindex()
     const { pages, graph } = await this.load()
-    const { contextBlock } = retrieve({
+    const { contextBlock } = await retrieve({
       query: question,
       store: this.store,
       graph,
@@ -243,8 +257,115 @@ export class Wiki {
     }
   }
 
+  /** Compute the health scorecard and append a trend point to state.json. */
+  async health(): Promise<{ scorecard: HealthScorecard; trend?: number }> {
+    const { pages, graph } = await this.load()
+    const staleCount = this.store.findStale().length
+    const scorecard = scoreHealth({ pages, graph, staleCount })
+    const state = await this.readState()
+    const prev = state.healthHistory.at(-1)?.composite
+    state.healthHistory.push({ at: new Date().toISOString(), composite: scorecard.composite })
+    if (state.healthHistory.length > 20) state.healthHistory = state.healthHistory.slice(-20)
+    state.lastMaintainedAt = state.lastMaintainedAt ?? null
+    await this.writeState(state)
+    return { scorecard, ...(prev !== undefined ? { trend: scorecard.composite - prev } : {}) }
+  }
+
+  /**
+   * Run the owned maintenance loop: fill knowledge gaps (propose stub pages) and
+   * refresh stale pages from their sources. With `auto`, it no-ops unless enough
+   * signal has accumulated — safe to wire to a post-ingest hook or cron.
+   */
+  async maintain(opts?: {
+    auto?: boolean
+    maxPropose?: number
+    minSignal?: number
+  }): Promise<MaintainResult> {
+    if (!this.opts.llm) throw new Error("maintain requires an LLM client")
+    const { pages, sources, graph } = await this.load()
+    const pageIds = new Set(pages.map((p) => p.id))
+    const stalePageIds = (await this.findStale()).filter((id) => pageIds.has(id))
+    const gaps = findKnowledgeGaps(graph)
+    const issues = lintPages(pages, sources, graph)
+    const plan = planMaintenance({ stalePageIds, gaps, lintIssues: issues, maxPropose: opts?.maxPropose })
+
+    const signal = stalePageIds.length + plan.counts.propose + plan.counts.review
+    if (opts?.auto && signal < (opts?.minSignal ?? 1)) {
+      return { ran: false, reason: "not enough accumulated signal", plan }
+    }
+
+    const byId = new Map(pages.map((p) => [p.id, p]))
+    let written = 0
+    let staleCleared = 0
+    for (const task of plan.tasks) {
+      if (task.kind === "propose" && task.target) {
+        const gap = gaps.find((g) => g.target === task.target)
+        if (!gap) continue
+        const snippets = gap.referencedBy.map((id) => byId.get(id)?.body.slice(0, 500) ?? "").join("\n---\n")
+        const { text } = await this.opts.llm.complete([
+          { role: "user", content: buildProposePrompt(gap, snippets) },
+        ])
+        for (const f of parseIngestBlocks(text).files) {
+          await this.writeGenerated(f.path, f.content)
+          written++
+        }
+      } else if (task.kind === "resynthesize" && task.pageId) {
+        const page = byId.get(task.pageId)
+        if (!page) continue
+        const sourceSnippets = (
+          await Promise.all((page.fm?.sources ?? []).map((s) => this.readSourceContent(s)))
+        ).join("\n---\n")
+        const { text } = await this.opts.llm.complete([
+          { role: "user", content: buildRefreshPrompt(task.pageId, page.body, sourceSnippets) },
+        ])
+        const blocks = parseIngestBlocks(text)
+        const match =
+          blocks.files.find((f) => f.path.replace(/\.md$/i, "").endsWith(task.pageId!)) ?? blocks.files[0]
+        if (match) {
+          await this.writeGenerated(match.path, match.content)
+          written++
+        }
+        this.store.clearStale(task.pageId)
+        staleCleared++
+      }
+    }
+
+    await this.appendLog(
+      `maintain | ${plan.counts.propose} gap(s) addressed, ${stalePageIds.length} stale page(s) reviewed`,
+    )
+    const state = await this.readState()
+    state.lastMaintainedAt = new Date().toISOString()
+    state.signals = {
+      staleCount: stalePageIds.length,
+      openIssues: plan.counts.review,
+      proposedPages: plan.counts.propose,
+    }
+    await this.writeState(state)
+    await this.reindex()
+    return { ran: true, plan, written, staleCleared }
+  }
+
   close(): void {
     this.store.close()
+  }
+
+  // --- state ---------------------------------------------------------------
+
+  private get statePath(): string {
+    return path.join(this.root, ".llmwiki", "state.json")
+  }
+
+  async readState(): Promise<WikiState> {
+    try {
+      const raw = await fs.readFile(this.statePath, "utf8")
+      return JSON.parse(raw) as WikiState
+    } catch {
+      return { healthHistory: [], lastMaintainedAt: null, signals: { staleCount: 0, openIssues: 0, proposedPages: 0 } }
+    }
+  }
+
+  async writeState(state: WikiState): Promise<void> {
+    await fs.writeFile(this.statePath, JSON.stringify(state, null, 2), "utf8")
   }
 
   // --- helpers -----------------------------------------------------------
@@ -275,6 +396,27 @@ export class Wiki {
       prev = "# Log\n\n"
     }
     await fs.writeFile(logPath, `${prev.replace(/\s+$/, "")}\n## [${stamp}] ${line}\n`, "utf8")
+  }
+
+  /** Write a model-generated page (path may or may not include the `wiki/` prefix). */
+  private async writeGenerated(relPath: string, content: string): Promise<void> {
+    const rel = relPath.replace(/^\/+/, "")
+    const target = rel.startsWith("wiki/") ? rel : `wiki/${rel}`
+    await fs.mkdir(path.dirname(path.join(this.root, target)), { recursive: true })
+    await fs.writeFile(
+      path.join(this.root, target),
+      content.endsWith("\n") ? content : `${content}\n`,
+      "utf8",
+    )
+  }
+
+  /** Read a source's text content by identity (path under raw/sources/). */
+  private async readSourceContent(sourceId: string): Promise<string> {
+    try {
+      return await fs.readFile(path.join(this.root, "raw", "sources", sourceId), "utf8")
+    } catch {
+      return ""
+    }
   }
 }
 

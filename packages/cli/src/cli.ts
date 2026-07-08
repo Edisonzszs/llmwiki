@@ -71,6 +71,7 @@ async function main(): Promise<void> {
       mock: { type: "boolean", default: false },
       json: { type: "boolean", default: false },
       fix: { type: "boolean", default: false },
+      auto: { type: "boolean", default: false },
       limit: { type: "string", default: "10" },
     },
   })
@@ -146,6 +147,34 @@ async function main(): Promise<void> {
       case "insights": {
         const r = await wiki.insights()
         console.log(JSON.stringify(r))
+        break
+      }
+      case "health": {
+        const { scorecard, trend } = await wiki.health()
+        if (flags.json) {
+          console.log(JSON.stringify({ ...scorecard, ...(trend !== undefined ? { trend } : {}) }))
+        } else {
+          const pct = (x: number) => `${(x * 100).toFixed(0)}%`
+          console.log(`composite      ${pct(scorecard.composite)}${trend !== undefined ? `  (trend ${trend >= 0 ? "+" : ""}${trend.toFixed(2)})` : ""}`)
+          console.log(`coverage       ${pct(scorecard.coverage)}`)
+          console.log(`citations      ${pct(scorecard.citationDensity)}`)
+          console.log(`freshness      ${pct(scorecard.freshness)}`)
+          console.log(`orphan-free    ${pct(scorecard.orphanRate)}`)
+          console.log(`connectivity   ${pct(scorecard.connectivity)}`)
+        }
+        break
+      }
+      case "maintain": {
+        const r = await wiki.maintain({ auto: Boolean(flags.auto) })
+        if (flags.json) console.log(JSON.stringify(r))
+        else if (!r.ran) console.log(`maintain skipped: ${r.reason}`)
+        else {
+          const c = r.plan.counts
+          console.log(
+            `maintain ran: ${r.written ?? 0} page(s) written, ${r.staleCleared ?? 0} stale cleared ` +
+              `(plan: ${c.resynthesize} resynthesize, ${c.propose} propose, ${c.review} review)`,
+          )
+        }
         break
       }
       case "index": {

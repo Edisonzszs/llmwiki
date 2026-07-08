@@ -90,6 +90,45 @@ describe("M1 end-to-end (deterministic core + mock LLM)", () => {
     wiki.close()
   })
 
+  it("maintains: fills a knowledge gap with a stub page (owned maintenance loop)", async () => {
+    const root = await freshKb()
+    const llm = new MockLlm((msgs) => {
+      const last = msgs.at(-1)?.content ?? ""
+      if (last.includes("Draft a concise stub page")) {
+        return [
+          "---FILE: wiki/concepts/missing-concept.md---",
+          "---",
+          "type: concept",
+          "title: Missing Concept",
+          "tags: [stub, gap]",
+          "related: []",
+          "sources: []",
+          "created: 2026-01-01",
+          "updated: 2026-01-01",
+          "confidence: INFERRED",
+          "---",
+          "",
+          "A stub created by the maintenance loop.",
+          "---END FILE---",
+        ].join("\n")
+      }
+      return "ok"
+    })
+    const wiki = createWiki(root, { llm })
+    await wiki.init()
+    await fs.mkdir(path.join(root, "wiki", "concepts"), { recursive: true })
+    await fs.writeFile(
+      path.join(root, "wiki", "concepts", "a.md"),
+      "---\ntype: concept\ntitle: A\ntags: [x, y]\n---\nSee [[concepts/missing-concept]].\n",
+      "utf8",
+    )
+    const r = await wiki.maintain({})
+    expect(r.ran).toBe(true)
+    expect((r.written ?? 0)).toBeGreaterThanOrEqual(1)
+    await fs.access(path.join(root, "wiki", "concepts", "missing-concept.md"))
+    wiki.close()
+  })
+
   it("deterministic methods work with no LLM at all", async () => {
     const root = await freshKb()
     const wiki = createWiki(root) // no llm

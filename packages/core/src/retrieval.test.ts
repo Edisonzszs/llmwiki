@@ -31,7 +31,7 @@ function page(id: string, body: string, related: string[] = []): Page {
 const entry = (p: Page): StoreEntry => ({ id: p.id, path: p.path, sourceKind: "wiki", title: p.id, content: p.body })
 
 describe("retrieve (BM25 + graph expansion)", () => {
-  it("seeds from BM25 and expands to graph neighbors", () => {
+  it("seeds from BM25 and expands to graph neighbors", async () => {
     const attention = page("concepts/attention", "attention is the key mechanism")
     const transformers = page("concepts/transformers", "transformer architecture", ["concepts/attention"])
     const cats = page("concepts/cats", "a note about cats and dogs")
@@ -40,7 +40,7 @@ describe("retrieve (BM25 + graph expansion)", () => {
     store.rebuild(pages.map(entry))
     const graph = buildGraph(pages, [])
 
-    const res = retrieve({
+    const res = await retrieve({
       query: "attention",
       store,
       graph,
@@ -53,13 +53,13 @@ describe("retrieve (BM25 + graph expansion)", () => {
     expect(ids).not.toContain("concepts/cats") // irrelevant, no link
   })
 
-  it("packs a context block with the retrieved page bodies", () => {
+  it("packs a context block with the retrieved page bodies", async () => {
     const attention = page("concepts/attention", "attention body text here")
     const transformers = page("concepts/transformers", "transformer body text here", ["concepts/attention"])
     const pages = [attention, transformers]
     const store = open()
     store.rebuild(pages.map(entry))
-    const res = retrieve({
+    const res = await retrieve({
       query: "attention",
       store,
       graph: buildGraph(pages, []),
@@ -71,14 +71,14 @@ describe("retrieve (BM25 + graph expansion)", () => {
     expect(res.contextBlock).toContain("[[concepts/transformers]]")
   })
 
-  it("respects the page budget when packing", () => {
+  it("respects the page budget when packing", async () => {
     const big = "x".repeat(20_000)
     const a = page("a", big)
     const b = page("b", big)
     const pages = [a, b]
     const store = open()
     store.rebuild(pages.map(entry))
-    const res = retrieve({
+    const res = await retrieve({
       query: "xxxx",
       store,
       graph: buildGraph(pages, []),
