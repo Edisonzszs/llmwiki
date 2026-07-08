@@ -131,6 +131,23 @@ async function main(): Promise<void> {
         console.log(JSON.stringify({ nodes: g.nodes.size, edges: g.edges.length, dataVersion: g.dataVersion }))
         break
       }
+      case "impact": {
+        const id = positionals[1]
+        if (!id) throw new Error("usage: llmwiki impact <page>")
+        const surface = await wiki.impactSurface(id)
+        if (flags.json) console.log(JSON.stringify(surface))
+        else if (!surface.length) console.log(`No pages reference ${id}.`)
+        else {
+          console.log(`${surface.length} page(s) reference ${id} (would go stale if it changes):`)
+          for (const s of surface) console.log(`  - ${s}`)
+        }
+        break
+      }
+      case "insights": {
+        const r = await wiki.insights()
+        console.log(JSON.stringify(r))
+        break
+      }
       case "index": {
         if (positionals[1] === "rebuild") {
           await wiki.reindex()
@@ -140,7 +157,7 @@ async function main(): Promise<void> {
       }
       default:
         throw new Error(
-          "commands: init | ingest <path> | ask <q> | search <q> | lint [--fix] | list | read <id> | graph | index rebuild",
+          "commands: init | ingest <path> | ask <q> | search <q> | lint [--fix] | list | read <id> | graph | impact <id> | insights | index rebuild",
         )
     }
   } finally {

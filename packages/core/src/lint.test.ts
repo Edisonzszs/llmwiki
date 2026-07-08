@@ -87,6 +87,18 @@ describe("lintPages — detection", () => {
     const issues = lintPages([a, b], [], buildGraph([a, b], []))
     expect(issues).toEqual([])
   })
+
+  it("flags a footnote citation not materialized in sources[] (citation-graph-mismatch)", () => {
+    const p = page("x", "Claim.[^1]\n\n[^1]: ml/paper.md, p. 4", { title: "X", sources: [] })
+    const issues = lintPages([p], [], buildGraph([p], []))
+    expect(ruleCodes(issues, "x")).toContain("citation-graph-mismatch")
+  })
+
+  it("does not flag a footnote citation that is listed in sources[]", () => {
+    const p = page("x", "Claim.[^1]\n\n[^1]: ml/paper.md, p. 4", { title: "X", sources: ["ml/paper.md"] })
+    const issues = lintPages([p], [], buildGraph([p], []))
+    expect(ruleCodes(issues, "x")).not.toContain("citation-graph-mismatch")
+  })
 })
 
 describe("applyLintFixes", () => {

@@ -1,4 +1,5 @@
 import { extractWikilinks } from "./graph.js"
+import { sourceReferenceIdentity } from "./source-identity.js"
 import type { Graph, Page, SourceRef } from "./types.js"
 
 /**
@@ -32,6 +33,23 @@ export interface LintIssue {
 
 const SPECIAL_PAGE_IDS = new Set(["overview", "index", "log", "purpose"])
 const MIN_TAGS = 2
+const FOOTNOTE_DEF_RE = /^\[\^[^\]\s]+\]:\s*(.+?)\s*$/gm
+
+/** Extract source references from footnote definitions (`[^id]: <ref>, p. N`). */
+export function extractFootnoteCitations(body: string): string[] {
+  const out: string[] = []
+  FOOTNOTE_DEF_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = FOOTNOTE_DEF_RE.exec(body)) !== null) {
+    const ref = (m[1] as string)
+      .split(/,\s*/)[0]!
+      .replace(/^\[\[|\]\]$/g, "")
+      .replace(/^["']|["']$/g, "")
+      .trim()
+    if (ref) out.push(ref)
+  }
+  return out
+}
 
 function normalizeId(id: string): string {
   return id.toLowerCase().replace(/\.md$/i, "")
@@ -128,6 +146,21 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
           severity: "warn",
           rule: "dangling-source",
           message: `Source '${s}' is not present in raw/sources.`,
+          autoFixable: false,
+        })
+      }
+    }
+
+    // Footnote citations must be materialized as a `cites` edge, i.e. listed in
+    // sources[]. A footnote whose target isn't in sources[] is a text/graph mismatch.
+    const declaredSources = new Set((p.fm.sources ?? []).map((s) => sourceReferenceIdentity(s)))
+    for (const citation of extractFootnoteCitations(p.body)) {
+      if (!declaredSources.has(sourceReferenceIdentity(citation))) {
+        issues.push({
+          pageId: p.id,
+          severity: "warn",
+          rule: "citation-graph-mismatch",
+          message: `Footnote cites '${citation}' but it is not in sources[] (no cites edge).`,
           autoFixable: false,
         })
       }

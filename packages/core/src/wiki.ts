@@ -10,6 +10,9 @@ import { normalizePath } from "./paths.js"
 import { sourceIdentityForPath } from "./source-identity.js"
 import { Store, type StoreEntry } from "./store.js"
 import { computeContextBudget } from "./context-budget.js"
+import { retrieve } from "./retrieval.js"
+import { impactSurface } from "./staleness.js"
+import { connectedComponents, findHubs, findKnowledgeGaps } from "./graph-insights.js"
 import type { Frontmatter, Graph, LlmClient, Page, SourceRef } from "./types.js"
 
 /**
@@ -136,25 +139,18 @@ export class Wiki {
     return { files: blocks.files.map((f) => f.path), reviews: blocks.reviews.length }
   }
 
-  /** Ask a question against the wiki (retrieval + synthesis). */
+  /** Ask a question against the wiki (hybrid retrieval + synthesis). */
   async ask(question: string): Promise<string> {
     if (!this.opts.llm) throw new Error("ask requires an LLM client")
     await this.reindex()
-    const hits = this.store.search(question, { limit: 8 })
-    const { pages } = await this.load()
-    const byId = new Map(pages.map((p) => [p.id, p]))
-    const budget = computeContextBudget(204_800)
-    let spent = 0
-    const contextChunks: string[] = []
-    for (const h of hits) {
-      const p = byId.get(h.pageId)
-      if (!p) continue
-      const body = p.body.slice(0, budget.maxPageSize)
-      if (spent + body.length > budget.pageBudget) break
-      spent += body.length
-      contextChunks.push(`### [[${p.id}]]\n${body}`)
-    }
-    const context = contextChunks.join("\n\n")
+    const { pages, graph } = await this.load()
+    const { contextBlock } = retrieve({
+      query: question,
+      store: this.store,
+      graph,
+      pages,
+      budget: computeContextBudget(204_800),
+    })
     const { text } = await this.opts.llm.complete([
       {
         role: "system",
@@ -162,7 +158,10 @@ export class Wiki {
           "Answer the user's question using ONLY the wiki context below. " +
           "Cite pages as [[page-id]]. If the context is insufficient, say so.",
       },
-      { role: "user", content: `## Wiki context\n${context || "(no relevant pages found)"}\n\n## Question\n${question}` },
+      {
+        role: "user",
+        content: `## Wiki context\n${contextBlock || "(no relevant pages found)"}\n\n## Question\n${question}`,
+      },
     ])
     return text
   }
@@ -210,6 +209,38 @@ export class Wiki {
   async getGraph(): Promise<Graph> {
     const { graph } = await this.load()
     return graph
+  }
+
+  /** Read-only impact surface: pages that reference `pageId` (would go stale if it changed). */
+  async impactSurface(pageId: string): Promise<string[]> {
+    const { graph } = await this.load()
+    return impactSurface(pageId, graph)
+  }
+
+  /** Mark the impact surface of `pageId` stale in the derived index (monotonic). */
+  async propagateStaleness(pageId: string): Promise<string[]> {
+    const stale = await this.impactSurface(pageId)
+    for (const id of stale) this.store.markStale(id)
+    return stale
+  }
+
+  /** Pages currently marked stale in the derived index. */
+  async findStale(): Promise<string[]> {
+    return this.store.findStale().map((r) => r.id)
+  }
+
+  /** Structural insights: knowledge gaps (proposed pages), hubs, connected components. */
+  async insights(): Promise<{
+    gaps: Array<{ target: string; referencedBy: string[] }>
+    hubs: Array<{ id: string; degree: number }>
+    components: string[][]
+  }> {
+    const { graph } = await this.load()
+    return {
+      gaps: findKnowledgeGaps(graph),
+      hubs: findHubs(graph).map((h) => ({ id: h.id, degree: h.degree })),
+      components: connectedComponents(graph),
+    }
   }
 
   close(): void {
