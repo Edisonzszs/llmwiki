@@ -62,6 +62,11 @@ export class Wiki {
     this.store = new Store(path.join(root, ".llmwiki", "index.db"))
   }
 
+  /** Whether an LLM client was injected (ingest/ask/maintain need one). */
+  get hasLlm(): boolean {
+    return !!this.opts.llm
+  }
+
   // --- lifecycle ---------------------------------------------------------
 
   /** Scaffold a fresh KB. */
@@ -184,6 +189,20 @@ export class Wiki {
   async search(query: string, opts?: { limit?: number }): Promise<{ pageId: string; title?: string }[]> {
     await this.reindex()
     return this.store.search(query, opts).map((h) => ({ pageId: h.pageId, ...(h.title ? { title: h.title } : {}) }))
+  }
+
+  /** Retrieve a packed context block for a query (deterministic; no LLM needed). */
+  async retrieveContext(query: string): Promise<{ hits: unknown[]; contextBlock: string }> {
+    await this.reindex()
+    const { pages, graph } = await this.load()
+    const res = await retrieve({
+      query,
+      store: this.store,
+      graph,
+      pages,
+      budget: computeContextBudget(204_800),
+    })
+    return { hits: res.hits, contextBlock: res.contextBlock }
   }
 
   /** Two-tier lint; with `fix`, applies Tier-1 patches and writes them back. */
