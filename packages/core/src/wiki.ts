@@ -206,22 +206,35 @@ export class Wiki {
   }
 
   /** Two-tier lint; with `fix`, applies Tier-1 patches and writes them back. */
-  async lint(opts?: { fix?: boolean; scope?: string }): Promise<LintIssue[]> {
+  async lint(opts?: { fix?: boolean }): Promise<LintIssue[]> {
     const { pages, sources, graph } = await this.load()
-    const scoped = opts?.scope ? pages.filter((p) => p.id.startsWith(opts.scope!.replace(/^\/+|\/+$/g, ""))) : pages
     let issues = lintPages(pages, sources, graph)
     if (opts?.fix) {
       const fixed = applyLintFixes(pages, issues)
+      const oldByPath = new Map(pages.map((p) => [p.path, p]))
+      // 1. Body/link rewrites for pages that stay in place.
       for (const p of fixed) {
-        if (p.body !== pages.find((x) => x.id === p.id)?.body) {
+        const orig = oldByPath.get(p.path)
+        if (orig && p.body !== orig.body) {
           await fs.writeFile(path.join(this.root, p.path), p.raw, "utf8")
         }
+      }
+      // 2. Relocate misplaced pages (copy rewritten content, delete old).
+      for (const m of issues) {
+        const fix = m.fix
+        if (!m.autoFixable || !fix || fix.kind !== "move-page") continue
+        const from = path.join(this.root, fix.fromPath)
+        const to = path.join(this.root, fix.toPath)
+        const fixedPage = fixed.find((fp) => fp.path === fix.toPath)
+        await fs.mkdir(path.dirname(to), { recursive: true })
+        const content = fixedPage?.raw ?? (await fs.readFile(from, "utf8"))
+        await fs.writeFile(to, content, "utf8")
+        await fs.rm(from, { force: true })
       }
       // Recompute remaining issues after fixes.
       const { pages: p2, sources: s2, graph: g2 } = await this.load()
       issues = lintPages(p2, s2, g2)
     }
-    void scoped
     return issues
   }
 

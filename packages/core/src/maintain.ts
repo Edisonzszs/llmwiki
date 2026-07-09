@@ -61,6 +61,11 @@ export function planMaintenance(input: {
 
 /** Prompt the model to draft a stub page for a missing concept (a knowledge gap). */
 export function buildProposePrompt(gap: KnowledgeGap, neighborSnippets: string): string {
+  const slug = gap.target
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+  const fileDir = gap.target.includes("/") ? `wiki/${gap.target.replace(/\.md$/i, "")}` : `wiki/concepts/${slug}`
   return [
     `A page for '${gap.target}' is referenced by ${gap.referencedBy.length} page(s) but does not exist.`,
     `Draft a concise stub page so the wiki has no dangling link.`,
@@ -69,10 +74,13 @@ export function buildProposePrompt(gap: KnowledgeGap, neighborSnippets: string):
     neighborSnippets.trim() || "(no snippets available)",
     ``,
     `## Output format (emit ONLY this block)`,
-    `---FILE: ${gap.target.includes("/") ? `wiki/${gap.target}` : `wiki/concepts/${gap.target}`}.md---`,
-    `<YAML frontmatter: type, title, tags (>=2), related, sources, created, updated, confidence: INFERRED>`,
+    `---FILE: ${fileDir}.md---`,
+    `<YAML frontmatter: type: concept, title, tags (>=2), related, sources, created, updated, confidence: INFERRED>`,
     `<short markdown body with [[wikilinks]]>`,
     `---END FILE---`,
+    ``,
+    `Path conventions: lowercase-kebab-case slug (no spaces); never touch wiki/purpose.md,`,
+    `wiki/overview.md, wiki/index.md, or wiki/log.md (reserved).`,
   ].join("\n")
 }
 

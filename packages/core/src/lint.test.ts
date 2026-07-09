@@ -5,7 +5,7 @@ import { applyLintFixes, lintPages } from "./lint.js"
 
 function mkFm(partial: Partial<Frontmatter>): Frontmatter {
   return {
-    type: "concept",
+    type: partial.type ?? "concept",
     title: partial.title ?? "t",
     tags: partial.tags ?? ["a", "b"],
     related: partial.related ?? [],
@@ -98,6 +98,47 @@ describe("lintPages — detection", () => {
     const p = page("x", "Claim.[^1]\n\n[^1]: ml/paper.md, p. 4", { title: "X", sources: ["ml/paper.md"] })
     const issues = lintPages([p], [], buildGraph([p], []))
     expect(ruleCodes(issues, "x")).not.toContain("citation-graph-mismatch")
+  })
+})
+
+describe("lintPages — path conventions & duplicates", () => {
+  it("flags duplicate pages sharing a basename", () => {
+    const a = page("concepts/foo", "", { title: "Foo", type: "concept" })
+    const b = page("system/foo", "", { title: "Foo2", type: "concept" })
+    const issues = lintPages([a, b], [], buildGraph([a, b], []))
+    expect(ruleCodes(issues, "concepts/foo")).toContain("duplicate-page")
+    expect(ruleCodes(issues, "system/foo")).toContain("duplicate-page")
+  })
+
+  it("flags + auto-fixes a singular type dir (concept -> concepts)", () => {
+    const p = page("concept/knowledge-compounding", "", { title: "KC", type: "concept" })
+    const issues = lintPages([p], [], buildGraph([p], []))
+    const issue = issues.find((i) => i.rule === "type-dir-mismatch")
+    expect(issue?.autoFixable).toBe(true)
+    expect(issue?.fix?.kind).toBe("move-page")
+    expect((issue?.fix as { toPath: string } | undefined)?.toPath).toBe(
+      "wiki/concepts/knowledge-compounding.md",
+    )
+  })
+
+  it("flags a non-canonical frontmatter type", () => {
+    const p = page("system/foo", "body", { title: "Foo", type: "system" })
+    const issues = lintPages([p], [], buildGraph([p], []))
+    expect(ruleCodes(issues, "system/foo")).toContain("non-canonical-type")
+  })
+
+  it("flags a reserved name used inside a subdir (log/log)", () => {
+    const p = page("log/log", "", { title: "Log", type: "overview" })
+    const issues = lintPages([p], [], buildGraph([p], []))
+    expect(ruleCodes(issues, "log/log")).toContain("reserved-path")
+  })
+
+  it("does not flag a correctly-placed canonical page with the path rules", () => {
+    const p = page("concepts/foo", "body", { title: "Foo", type: "concept" })
+    const codes = ruleCodes(lintPages([p], [], buildGraph([p], [])), "concepts/foo")
+    for (const r of ["type-dir-mismatch", "duplicate-page", "non-canonical-type", "reserved-path"]) {
+      expect(codes).not.toContain(r)
+    }
   })
 })
 

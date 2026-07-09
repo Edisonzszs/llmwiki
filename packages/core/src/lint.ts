@@ -16,11 +16,9 @@ import type { Graph, Page, SourceRef } from "./types.js"
 
 export type LintSeverity = "error" | "warn" | "info"
 
-export interface LintFix {
-  kind: "rewrite-wikilink"
-  oldTarget: string
-  newTarget: string
-}
+export type LintFix =
+  | { kind: "rewrite-wikilink"; oldTarget: string; newTarget: string }
+  | { kind: "move-page"; fromPath: string; toPath: string }
 
 export interface LintIssue {
   pageId: string
@@ -32,7 +30,24 @@ export interface LintIssue {
 }
 
 const SPECIAL_PAGE_IDS = new Set(["overview", "index", "log", "purpose"])
+const RESERVED_NAMES = new Set(["overview", "index", "log", "purpose"])
 const MIN_TAGS = 2
+
+/** Canonical content-type -> directory (singular frontmatter type to plural dir). */
+const CANON_DIR: Record<string, string> = {
+  entity: "entities",
+  concept: "concepts",
+  source: "sources",
+  query: "queries",
+  comparison: "comparisons",
+  synthesis: "synthesis",
+  archive: "archive",
+}
+
+function dirOf(id: string): string {
+  const i = id.lastIndexOf("/")
+  return i >= 0 ? id.slice(0, i) : ""
+}
 const FOOTNOTE_DEF_RE = /^\[\^[^\]\s]+\]:\s*(.+?)\s*$/gm
 
 /** Extract source references from footnote definitions (`[^id]: <ref>, p. N`). */
@@ -197,23 +212,98 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
     }
   }
 
+  // Path conventions & duplicates (content pages only).
+  const contentPages = pages.filter((p) => p.fm && !SPECIAL_PAGE_IDS.has(p.id))
+  const byKey = new Map<string, Page[]>()
+  for (const p of contentPages) {
+    const key = basename(p.id).toLowerCase().replace(/\.md$/i, "").replace(/\s+/g, "-")
+    let arr = byKey.get(key)
+    if (!arr) {
+      arr = []
+      byKey.set(key, arr)
+    }
+    arr.push(p)
+  }
+  for (const group of byKey.values()) {
+    if (group.length > 1) {
+      for (const p of group) {
+        issues.push({
+          pageId: p.id,
+          severity: "warn",
+          rule: "duplicate-page",
+          message: `Page '${p.id}' duplicates ${group.length - 1} other page(s) by name — consider merging.`,
+          autoFixable: false,
+        })
+      }
+    }
+  }
+  for (const p of contentPages) {
+    const dir = dirOf(p.id)
+    const base = basename(p.id)
+    const type = String(p.fm?.type ?? "concept")
+    if (RESERVED_NAMES.has(base.toLowerCase()) && dir !== "") {
+      issues.push({
+        pageId: p.id,
+        severity: "warn",
+        rule: "reserved-path",
+        message: `Page '${p.id}' uses reserved name '${base}' inside a directory; reserved names belong at the wiki root.`,
+        autoFixable: false,
+      })
+      continue
+    }
+    const canonical = CANON_DIR[type]
+    if (!canonical) {
+      if (!RESERVED_NAMES.has(type)) {
+        issues.push({
+          pageId: p.id,
+          severity: "warn",
+          rule: "non-canonical-type",
+          message: `Page '${p.id}' has non-canonical type '${type}' (expected one of: ${[...Object.keys(CANON_DIR)].join(", ")}).`,
+          autoFixable: false,
+        })
+      }
+    } else if (dir !== "" && dir !== canonical) {
+      issues.push({
+        pageId: p.id,
+        severity: "warn",
+        rule: "type-dir-mismatch",
+        message: `Page '${p.id}' (type ${type}) should live in ${canonical}/.`,
+        autoFixable: true,
+        fix: { kind: "move-page", fromPath: p.path, toPath: `wiki/${canonical}/${base}.md` },
+      })
+    }
+  }
+
   return issues
 }
 
-/** Apply Tier-1 auto-fixable patches (currently: rewrite normalizable wikilinks). */
+/** Apply Tier-1 auto-fixable patches: rewrite normalizable wikilinks + relocate misplaced pages. */
 export function applyLintFixes(pages: Page[], issues: LintIssue[]): Page[] {
   return pages.map((p) => {
-    const fixes = issues.filter(
+    const moveFix = issues.find(
+      (i) => i.pageId === p.id && i.autoFixable && i.fix?.kind === "move-page",
+    )?.fix
+    const newPath = moveFix?.kind === "move-page" ? moveFix.toPath : p.path
+    const newId = newPath.replace(/^wiki\//, "").replace(/\.md$/i, "")
+
+    const rewriteFixes = issues.filter(
       (i) => i.pageId === p.id && i.autoFixable && i.fix?.kind === "rewrite-wikilink",
     )
-    if (!fixes.length) return p
+    if (!rewriteFixes.length && newPath === p.path) return p
+
     const rewrite = (text: string): string =>
       text.replace(/\[\[([^\]\|]+)(\|[^\]]*)?\]\]/g, (match, target: string, alias?: string) => {
-        const f = fixes.find(
+        const f = rewriteFixes.find(
           (x) => x.fix?.kind === "rewrite-wikilink" && x.fix.oldTarget === target,
         )
-        return f ? `[[${(f.fix as LintFix).newTarget}${alias ?? ""}]]` : match
+        return f ? `[[${(f.fix as { newTarget: string }).newTarget}${alias ?? ""}]]` : match
       })
-    return { ...p, body: rewrite(p.body), raw: rewrite(p.raw) }
+    return {
+      ...p,
+      id: newId,
+      path: newPath,
+      body: rewriteFixes.length ? rewrite(p.body) : p.body,
+      raw: rewriteFixes.length ? rewrite(p.raw) : p.raw,
+    }
   })
 }
