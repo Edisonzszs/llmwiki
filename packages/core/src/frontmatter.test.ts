@@ -54,4 +54,34 @@ describe("parseFrontmatter", () => {
     const r = parseFrontmatter(content)
     expect(r.rawBlock + r.body).toBe(content)
   })
+
+  it("recovers fenceless leading YAML the model emitted without --- fences", () => {
+    const content = [
+      "type: concept",
+      "title: Andrej Karpathy",
+      "tags:",
+      "  - ai",
+      "  - ml",
+      "created: 2024-01-01",
+      "",
+      "# Andrej Karpathy",
+      "",
+      "Body text.",
+    ].join("\n")
+    const r = parseFrontmatter(content)
+    expect(r.frontmatter).toEqual({
+      type: "concept",
+      title: "Andrej Karpathy",
+      tags: ["ai", "ml"],
+      created: "2024-01-01",
+    })
+    expect(r.body).toContain("# Andrej Karpathy")
+  })
+
+  it("does not mistake prose-with-colons for fenceless frontmatter", () => {
+    // no known frontmatter keys -> not recovered as YAML
+    const content = "Summary: a note.\nNote: another line.\n\nA paragraph of body."
+    const r = parseFrontmatter(content)
+    expect(r.frontmatter).toBeNull()
+  })
 })

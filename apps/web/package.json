@@ -1,7 +1,21 @@
 {
   "name": "@llmwiki/web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Web/graph UI for the LLM Wiki engine. DEFERRED — interface contract only (see README.md).",
-  "license": "MIT"
+  "description": "Web/graph UI for the LLM Wiki engine — local HTTP API over createWiki + a self-contained force-directed graph client.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "llmwiki-web": "./src/server.ts"
+  },
+  "scripts": {
+    "serve": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@llmwiki/core": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
 }

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Wiki — graph</title>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --panel2: #1c2230;
+        --text: #c9d1d9;
+        --dim: #8b949e;
+        --accent: #58a6ff;
+        --border: #30363d;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+        font: 14px/1.5 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif; }
+      #app { display: grid; grid-template-columns: 260px 1fr 420px; grid-template-rows: 44px 1fr; height: 100vh; }
+      header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+        background: var(--panel); border-bottom: 1px solid var(--border); }
+      header h1 { font-size: 14px; margin: 0; font-weight: 600; white-space: nowrap; }
+      header .badge { font-size: 12px; color: var(--dim); border: 1px solid var(--border);
+        padding: 2px 8px; border-radius: 10px; }
+      header input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+        padding: 5px 9px; border-radius: 6px; outline: none; max-width: 320px; }
+      header input:focus { border-color: var(--accent); }
+      header button { background: var(--accent); color: #04142a; border: none; padding: 5px 12px;
+        border-radius: 6px; cursor: pointer; font-weight: 600; }
+      #sidebar { background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; padding: 8px; }
+      .page-item { padding: 5px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; }
+      .page-item:hover { background: var(--panel2); }
+      .page-item.active { background: var(--panel2); color: var(--accent); }
+      .page-item .typ { color: var(--dim); font-size: 11px; }
+      #graph-wrap { position: relative; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+      canvas:active { cursor: grabbing; }
+      #legend { position: absolute; left: 10px; bottom: 10px; background: rgba(22,27,34,.85);
+        border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 11px; }
+      #legend .row { display: flex; align-items: center; gap: 6px; }
+      #legend .dot { width: 9px; height: 9px; border-radius: 50%; }
+      #reader { background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; padding: 18px; }
+      #reader h2 { margin: 0 0 4px; font-size: 17px; }
+      #reader .meta { color: var(--dim); font-size: 12px; margin-bottom: 14px; }
+      #reader .empty { color: var(--dim); }
+      #reader h1, #reader h2, #reader h3 { color: #fff; }
+      #reader a { color: var(--accent); cursor: pointer; text-decoration: none; }
+      #reader a:hover { text-decoration: underline; }
+      #reader pre { background: var(--bg); padding: 10px; border-radius: 6px; overflow-x: auto; }
+      #reader code { background: var(--bg); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+      #answer { margin-top: 12px; background: var(--panel2); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px 12px; font-size: 13px; }
+      .pill { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+        border-radius: 4px; padding: 0 5px; font-size: 11px; margin: 0 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>LLM Wiki</h1>
+        <span class="badge" id="health">health …</span>
+        <input id="search" placeholder="search pages…" />
+        <input id="ask" placeholder="ask a question…" style="max-width:260px" />
+        <button id="ask-btn">ask</button>
+      </header>
+      <div id="sidebar"><div class="empty" style="color:var(--dim);padding:8px">loading…</div></div>
+      <div id="graph-wrap">
+        <canvas id="canvas"></canvas>
+        <div id="legend"></div>
+      </div>
+      <div id="reader"><div class="empty">select a page to read</div></div>
+    </div>
+
+    <script>
+      const TYPE_COLOR = {
+        concept: "#58a6ff", entity: "#f0883e", source: "#3fb950", query: "#bc8cff",
+        comparison: "#f778ba", synthesis: "#79c0ff", overview: "#d2a8ff", archive: "#8b949e",
+        sources: "#3fb950", entities: "#f0883e", index: "#8b949e", log: "#8b949e", purpose: "#8b949e",
+      };
+      const colorFor = (t) => TYPE_COLOR[t] || "#8b949e";
+
+      const api = (p) => fetch(p).then((r) => r.json());
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      let W = 0, H = 0, nodes = [], edges = [], byId = {}, selectedId = null, hoverId = null;
+      let alpha = 1; // simulation temperature
+
+      function resize() {
+        const r = canvas.parentElement.getBoundingClientRect();
+        W = canvas.width = r.width * devicePixelRatio;
+        H = canvas.height = r.height * devicePixelRatio;
+        canvas.style.width = r.width + "px";
+        canvas.style.height = r.height + "px";
+        ctx.scale(1, 1);
+      }
+      window.addEventListener("resize", resize);
+
+      async function loadGraph() {
+        const g = await api("/api/graph");
+        nodes = g.nodes.map((n, i) => {
+          const a = (i / g.nodes.length) * Math.PI * 2;
+          return { ...n, x: W / 2 + Math.cos(a) * 120, y: H / 2 + Math.sin(a) * 120, vx: 0, vy: 0, pinned: false };
+        });
+        edges = g.edges;
+        byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+        alpha = 1;
+        renderLegend();
+        loadSidebar();
+      }
+
+      function renderLegend() {
+        const types = [...new Set(nodes.map((n) => n.type))].slice(0, 8);
+        document.getElementById("legend").innerHTML = types
+          .map((t) => `<div class="row"><span class="dot" style="background:${colorFor(t)}"></span>${t}</div>`)
+          .join("");
+      }
+
+      async function loadSidebar() {
+        const pages = await api("/api/pages");
+        const box = document.getElementById("sidebar");
+        box.innerHTML = pages
+          .map(
+            (p) =>
+              `<div class="page-item" data-id="${p.id}">${p.title || p.id} <span class="typ">${p.type || ""}</span></div>`
+          )
+          .join("");
+        box.querySelectorAll(".page-item").forEach((el) =>
+          el.addEventListener("click", () => selectPage(el.dataset.id))
+        );
+      }
+
+      async function loadHealth() {
+        const h = await api("/api/health");
+        const s = h.scorecard;
+        document.getElementById("health").textContent =
+          `health ${Math.round(s.composite * 100)}% · cov ${Math.round(s.coverage * 100)}% · orphans ${Math.round((1 - s.orphanRate) * 100)}%`;
+      }
+
+      async function selectPage(id) {
+        selectedId = id;
+        document.querySelectorAll(".page-item").forEach((el) =>
+          el.classList.toggle("active", el.dataset.id === id)
+        );
+        const p = await api("/api/page?id=" + encodeURIComponent(id));
+        const reader = document.getElementById("reader");
+        if (!p) { reader.innerHTML = '<div class="empty">not found</div>'; return; }
+        const fm = p.fm || {};
+        reader.innerHTML =
+          `<h2>${fm.title || id}</h2>` +
+          `<div class="meta">${fm.type || ""} ${fm.confidence ? '· <span class="pill">' + fm.confidence + '</span>' : ""} ` +
+          `${(fm.tags || []).map((t) => '<span class="pill">' + t + '</span>').join("")}</div>` +
+          renderMarkdown(p.body || "");
+        bindWikilinks(reader);
+      }
+
+      // tiny markdown renderer: headings, bold, code, lists, [[wikilinks]]
+      function renderMarkdown(md) {
+        const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const lines = md.split("\n");
+        let html = "", inList = false, inCode = false;
+        for (let raw of lines) {
+          if (raw.trim().startsWith("```")) { inCode = !inCode; html += inCode ? "<pre>" : "</pre>"; continue; }
+          if (inCode) { html += esc(raw) + "\n"; continue; }
+          let line = esc(raw);
+          if (/^\s*#{1,3}\s/.test(line)) {
+            const m = line.match(/^\s*(#{1,3})\s+(.*)/); if (inList) { html += "</ul>"; inList = false; }
+            html += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; continue;
+          }
+          if (/^\s*[-*]\s/.test(line)) {
+            if (!inList) { html += "<ul>"; inList = true; }
+            html += "<li>" + inline(line.replace(/^\s*[-*]\s/, "")) + "</li>"; continue;
+          }
+          if (line.trim() === "") { if (inList) { html += "</ul>"; inList = false; } html += "<p></p>"; continue; }
+          if (inList) { html += "</ul>"; inList = false; }
+          html += "<p>" + inline(line) + "</p>";
+        }
+        if (inList) html += "</ul>";
+        if (inCode) html += "</pre>";
+        return html;
+      }
+      function inline(s) {
+        return s
+          .replace(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g, '<a data-link="$1">$1</a>')
+          .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+          .replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\[\^([^\]]+)\]/g, '<sup>[$1]</sup>');
+      }
+      function bindWikilinks(root) {
+        root.querySelectorAll("a[data-link]").forEach((a) =>
+          a.addEventListener("click", () => {
+            const t = a.dataset.link.replace(/^wiki\//, "").replace(/\.md$/i, "");
+            // resolve via the loaded graph (basename/title/slug fuzzy)
+            const match = nodes.find((n) => fuzzyEq(n, t));
+            if (match) selectPage(match.id);
+          })
+        );
+      }
+      function fuzzyEq(n, t) {
+        const slug = (s) => s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        const tn = t.toLowerCase();
+        return n.id === t || n.id.endsWith("/" + t) || n.label.toLowerCase() === tn ||
+          slug(n.id.split("/").pop()) === slug(t) || slug(n.label) === slug(t);
+      }
+
+      // ---- force simulation + render ----
+      function step() {
+        if (alpha > 0.01 && nodes.length) {
+          const rep = 4200 * alpha, k = 0.02 * alpha;
+          for (let i = 0; i < nodes.length; i++) {
+            const a = nodes[i];
+            a.vx *= 0.85; a.vy *= 0.85;
+            // center gravity
+            a.vx += (W / 2 - a.x) * 0.0008 * alpha;
+            a.vy += (H / 2 - a.y) * 0.0008 * alpha;
+            for (let j = 0; j < nodes.length; j++) {
+              if (i === j) continue;
+              const b = nodes[j];
+              let dx = a.x - b.x, dy = a.y - b.y;
+              let d2 = dx * dx + dy * dy + 0.01;
+              let f = rep / d2;
+              a.vx += (dx / Math.sqrt(d2)) * f;
+              a.vy += (dy / Math.sqrt(d2)) * f;
+            }
+          }
+          for (const e of edges) {
+            const a = byId[e.source], b = byId[e.target];
+            if (!a || !b) continue;
+            let dx = b.x - a.x, dy = b.y - a.y;
+            let d = Math.sqrt(dx * dx + dy * dy) + 0.01;
+            let f = (d - 90) * k;
+            const ux = dx / d, uy = dy / d;
+            if (!a.pinned) { a.vx += ux * f; a.vy += uy * f; }
+            if (!b.pinned) { b.vx -= ux * f; b.vy -= uy * f; }
+          }
+          for (const n of nodes) {
+            if (n.pinned) continue;
+            n.x += n.vx; n.y += n.vy;
+            n.x = Math.max(20, Math.min(W - 20, n.x));
+            n.y = Math.max(20, Math.min(H - 20, n.y));
+          }
+          alpha *= 0.992;
+        }
+        draw();
+        requestAnimationFrame(step);
+      }
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        const nb = selectedId ? neighborhood(selectedId) : null;
+        // edges
+        for (const e of edges) {
+          const a = byId[e.source], b = byId[e.target];
+          if (!a || !b) continue;
+          const dim = nb && !nb.has(a.id) && !nb.has(b.id);
+          ctx.strokeStyle = e.relation === "cites"
+            ? `rgba(240,170,80,${dim ? 0.05 : 0.28})`
+            : `rgba(140,160,200,${dim ? 0.05 : 0.22})`;
+          ctx.lineWidth = e.relation === "cites" ? 1 : 1;
+          if (e.relation === "cites") ctx.setLineDash([4, 4]); else ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        // nodes
+        for (const n of nodes) {
+          const r = 4 + Math.min(10, n.degree) * devicePixelRatio;
+          const dim = nb && !nb.has(n.id);
+          const hot = n.id === selectedId || n.id === hoverId;
+          ctx.globalAlpha = dim ? 0.25 : 1;
+          ctx.fillStyle = colorFor(n.type);
+          ctx.beginPath(); ctx.arc(n.x, n.y, hot ? r + 3 : r, 0, Math.PI * 2); ctx.fill();
+          if (hot) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
+          ctx.globalAlpha = dim ? 0.35 : 1;
+          ctx.fillStyle = "#c9d1d9";
+          ctx.font = `${11 * devicePixelRatio}px sans-serif`;
+          ctx.fillText(n.label.slice(0, 24), n.x + r + 3, n.y + 4);
+          ctx.globalAlpha = 1;
+        }
+      }
+      function neighborhood(id) {
+        const set = new Set([id]);
+        for (const e of edges) {
+          if (e.source === id) set.add(e.target);
+          if (e.target === id) set.add(e.source);
+        }
+        return set;
+      }
+
+      // ---- interaction ----
+      function pointer(e) {
+        const r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * devicePixelRatio, y: (e.clientY - r.top) * devicePixelRatio };
+      }
+      function nodeAt(pt) {
+        for (let i = nodes.length - 1; i >= 0; i--) {
+          const n = nodes[i], r = 4 + Math.min(10, n.degree) * devicePixelRatio + 4;
+          if ((n.x - pt.x) ** 2 + (n.y - pt.y) ** 2 <= r * r) return n;
+        }
+        return null;
+      }
+      let drag = null;
+      canvas.addEventListener("mousedown", (e) => {
+        const pt = pointer(e), n = nodeAt(pt);
+        if (n) { drag = n; n.pinned = true; n.x = pt.x; n.y = pt.y; alpha = Math.max(alpha, 0.5); }
+      });
+      canvas.addEventListener("mousemove", (e) => {
+        const pt = pointer(e);
+        hoverId = nodeAt(pt)?.id ?? null;
+        if (drag) { drag.x = pt.x; drag.y = pt.y; alpha = Math.max(alpha, 0.4); }
+      });
+      window.addEventListener("mouseup", (e) => {
+        if (drag) {
+          const moved = (drag._dx ?? 0) > 3;
+          drag = null;
+        }
+      });
+      canvas.addEventListener("click", (e) => {
+        const pt = pointer(e), n = nodeAt(pt);
+        if (n) selectPage(n.id);
+      });
+
+      // search + ask
+      document.getElementById("search").addEventListener("input", async (e) => {
+        const q = e.target.value.trim();
+        if (!q) return;
+        const hits = await api("/api/search?q=" + encodeURIComponent(q));
+        const ids = new Set(hits.map((h) => h.pageId));
+        nodes.forEach((n) => (n._dim = !ids.has(n.id)));
+        // brief highlight by re-heating + bringing hits forward
+        alpha = Math.max(alpha, 0.3);
+      });
+      async function doAsk() {
+        const q = document.getElementById("ask").value.trim();
+        if (!q) return;
+        document.getElementById("answer")?.remove();
+        const reader = document.getElementById("reader");
+        const box = document.createElement("div");
+        box.id = "answer";
+        box.textContent = "thinking…";
+        reader.prepend(box);
+        const r = await fetch("/api/ask", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q }),
+        }).then((x) => x.json());
+        box.innerHTML = r.answer ? "<b>Q:</b> " + escapeHtml(q) + "<br><br>" + inline(escapeHtml(r.answer)) : "<b>error:</b> " + (r.error || "");
+        bindWikilinks(box);
+      }
+      function escapeHtml(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+      document.getElementById("ask-btn").addEventListener("click", doAsk);
+      document.getElementById("ask").addEventListener("keydown", (e) => { if (e.key === "Enter") doAsk(); });
+
+      // boot
+      resize();
+      loadGraph().then(loadHealth);
+      requestAnimationFrame(step);
+    </script>
+  </body>
+</html>

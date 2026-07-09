@@ -28,7 +28,11 @@ const MAX_PREFIX_LINES_BEFORE_FRONTMATTER = 6
 
 export function parseFrontmatter(content: string): FrontmatterParseResult {
   const located = locateFrontmatterBlock(content)
-  if (!located) return { frontmatter: null, body: content, rawBlock: "" }
+  if (!located) {
+    const recovered = recoverFencelessYaml(content)
+    if (recovered) return recovered
+    return { frontmatter: null, body: content, rawBlock: "" }
+  }
 
   const { yamlPayload, rawBlock, body } = located
 
@@ -95,6 +99,48 @@ function lineNumberAt(s: string, index: number): number {
     if (s.charCodeAt(i) === 10) line++
   }
   return line
+}
+
+const FM_KNOWN_KEYS = new Set([
+  "type", "title", "tags", "related", "sources", "created", "updated",
+  "confidence", "authors", "year", "url", "venue",
+])
+
+/**
+ * Recover frontmatter the model emitted WITHOUT `---` fences: a leading block of
+ * `key: value` (possibly with indented list/nested values), followed by the body.
+ * Guarded by (a) >=2 leading YAML lines and (b) at least one known wiki key, so
+ * ordinary prose with colons ("Summary: ...") is not mistaken for frontmatter.
+ */
+function recoverFencelessYaml(content: string): FrontmatterParseResult | null {
+  const lines = content.split("\n")
+  const yamlLines: string[] = []
+  let i = 0
+  while (i < lines.length) {
+    const ln = lines[i] as string
+    if (/^[A-Za-z_][\w-]*\s*:/.test(ln)) {
+      yamlLines.push(ln)
+      i++
+      while (i < lines.length && /^[ \t]+/.test(lines[i] as string)) {
+        yamlLines.push(lines[i] as string)
+        i++
+      }
+      continue
+    }
+    break
+  }
+  if (yamlLines.length < 2) return null
+  const payload = yamlLines.join("\n")
+  let parsed: unknown
+  try {
+    parsed = yaml.load(payload, { schema: yaml.JSON_SCHEMA })
+  } catch {
+    return null
+  }
+  const fm = normalize(parsed)
+  if (!fm || !Object.keys(fm).some((k) => FM_KNOWN_KEYS.has(k))) return null
+  const body = lines.slice(i).join("\n").replace(/^\n+/, "")
+  return { frontmatter: fm, body, rawBlock: `---\n${payload}\n---\n` }
 }
 
 /**
