@@ -1,4 +1,4 @@
-import { extractWikilinks, normalizeLinkTarget } from "./graph.js"
+import { createPageResolver, extractWikilinks, normalizeLinkTarget } from "./graph.js"
 import { sourceReferenceIdentity } from "./source-identity.js"
 import type { Graph, Page, SourceRef } from "./types.js"
 
@@ -60,6 +60,10 @@ function basename(p: string): string {
   return i >= 0 ? p.slice(i + 1) : p
 }
 
+function sourceBase(p: string): string {
+  return basename(p).replace(/\.md$/i, "")
+}
+
 export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): LintIssue[] {
   const issues: LintIssue[] = []
   const knownPageIds = new Set(pages.map((p) => p.id))
@@ -70,7 +74,8 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
     if (!normalizedIndex.has(n)) normalizedIndex.set(n, p.id)
   }
   const sourceIds = new Set(sources.map((s) => s.id))
-  const sourceBasenames = new Set(sources.map((s) => basename(s.id)))
+  const sourceBasenames = new Set(sources.map((s) => sourceBase(s.id)))
+  const resolveLink = createPageResolver(pages)
 
   for (const p of pages) {
     if (!p.fm) {
@@ -108,7 +113,8 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
       })
     }
 
-    // Body wikilinks: known, normalizable (autoFixable), or broken.
+    // Body wikilinks: exact (clean), trivially normalizable (auto-fixable),
+    // fuzzy-resolvable by basename/title (fine, readable link), or truly broken.
     for (const target of extractWikilinks(p.body)) {
       if (knownPageIds.has(target)) continue
       const canonical = normalizedIndex.get(normalizeId(target))
@@ -121,34 +127,34 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
           autoFixable: true,
           fix: { kind: "rewrite-wikilink", oldTarget: target, newTarget: canonical },
         })
-      } else {
-        issues.push({
-          pageId: p.id,
-          severity: "warn",
-          rule: "broken-wikilink",
-          message: `Link '[[${target}]]' points to no page.`,
-          autoFixable: false,
-        })
+        continue
       }
+      if (resolveLink(target)) continue // fuzzy-resolvable (basename/title) — not broken
+      issues.push({
+        pageId: p.id,
+        severity: "warn",
+        rule: "broken-wikilink",
+        message: `Link '[[${target}]]' points to no page.`,
+        autoFixable: false,
+      })
     }
 
-    // related[] links: broken detection only (auto-fix of frontmatter lists is later).
+    // related[] links: broken only when not resolvable (exact or fuzzy).
     for (const target of p.fm.related ?? []) {
       const normalized = normalizeLinkTarget(target)
-      if (!knownPageIds.has(normalized)) {
-        issues.push({
-          pageId: p.id,
-          severity: "warn",
-          rule: "broken-wikilink",
-          message: `Related link '${target}' points to no page.`,
-          autoFixable: false,
-        })
-      }
+      if (knownPageIds.has(normalized) || resolveLink(normalized)) continue
+      issues.push({
+        pageId: p.id,
+        severity: "warn",
+        rule: "broken-wikilink",
+        message: `Related link '${target}' points to no page.`,
+        autoFixable: false,
+      })
     }
 
     for (const s of p.fm.sources ?? []) {
       const present =
-        sourceIds.has(s) || sourceIds.has(sourceReferenceIdentity(s)) || sourceBasenames.has(basename(s))
+        sourceIds.has(s) || sourceIds.has(sourceReferenceIdentity(s)) || sourceBasenames.has(sourceBase(s))
       if (!present) {
         issues.push({
           pageId: p.id,

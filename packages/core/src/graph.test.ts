@@ -68,6 +68,28 @@ describe("buildGraph", () => {
     expect(g.nodes.get("concepts/foo")?.degree).toBeGreaterThan(0)
   })
 
+  it("resolves a bare-title wikilink to a page by basename (Obsidian-style fuzzy match)", () => {
+    const foo = page("concepts/LLM Wiki", "", { title: "LLM Wiki" })
+    const ref = page("a", "see [[LLM Wiki]]", { title: "A" })
+    const g = buildGraph([foo, ref], [])
+    expect(g.edges.some((e) => e.source === "a" && e.target === "concepts/LLM Wiki")).toBe(true)
+    expect(g.nodes.get("concepts/LLM Wiki")?.degree).toBeGreaterThan(0)
+  })
+
+  it("resolves a bare-slug wikilink to a page whose basename matches", () => {
+    const sys = page("system/llmwiki-overview", "", { title: "Overview" })
+    const ref = page("a", "see [[llmwiki-overview]]", { title: "A" })
+    const g = buildGraph([sys, ref], [])
+    expect(g.edges.some((e) => e.target === "system/llmwiki-overview")).toBe(true)
+  })
+
+  it("resolves a wikilink that uses a page's title (not its slug)", () => {
+    const kc = page("concepts/knowledge-compounding", "", { title: "Knowledge Compounding" })
+    const ref = page("a", "see [[Knowledge Compounding]]", { title: "A" })
+    const g = buildGraph([kc, ref], [])
+    expect(g.edges.some((e) => e.target === "concepts/knowledge-compounding")).toBe(true)
+  })
+
   it("creates a cites edge from sources frontmatter and carries confidence", () => {
     const src: SourceRef = { id: "ml/paper.pdf", path: "raw/sources/ml/paper.pdf", title: "Paper" }
     const g = buildGraph([page("a", "", { sources: ["ml/paper.pdf"], confidence: "EXTRACTED" })], [src])
