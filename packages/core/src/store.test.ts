@@ -86,4 +86,13 @@ describe("Store (SQLite + FTS5)", () => {
     const second = s.search("attention").map((h) => h.pageId)
     expect(second).toEqual(first)
   })
+
+  it("uses OR semantics for multi-term queries so natural-language questions still match", () => {
+    const s = openStore()
+    s.rebuild([entry("a", "the llm wiki versus rag pipelines"), entry("b", "totally unrelated note about cats")])
+    // a natural-language query whose stop words ("what", "is", "the") aren't all in the page
+    const hits = s.search("what is the difference between llm and rag")
+    expect(hits.map((h) => h.pageId)).toContain("a")
+    expect(hits.map((h) => h.pageId)).not.toContain("b")
+  })
 })

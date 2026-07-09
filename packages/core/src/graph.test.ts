@@ -28,6 +28,14 @@ describe("extractWikilinks", () => {
     expect(extractWikilinks("[[concepts/attention.md|Attention]]")).toEqual(["concepts/attention"])
   })
 
+  it("normalizes a wiki/-prefixed path to the bare page id", () => {
+    // models naturally write [[wiki/concepts/foo]] (the on-disk path); page ids drop wiki/
+    expect(extractWikilinks("see [[wiki/concepts/foo]] and [[wiki/operations/bar.md]]")).toEqual([
+      "concepts/foo",
+      "operations/bar",
+    ])
+  })
+
   it("returns an empty array when there are no wikilinks", () => {
     expect(extractWikilinks("plain text, no links")).toEqual([])
   })
@@ -49,6 +57,15 @@ describe("buildGraph", () => {
   it("creates a links_to edge from related frontmatter", () => {
     const g = buildGraph([page("a", "", { related: ["b"] }), page("b")], [])
     expect(g.edges.some((e) => e.source === "a" && e.target === "b" && e.relation === "links_to")).toBe(true)
+  })
+
+  it("normalizes wiki/-prefixed related entries to bare page ids", () => {
+    const g = buildGraph(
+      [page("a", "", { related: ["wiki/concepts/foo.md"] }), page("concepts/foo", "", { title: "Foo" })],
+      [],
+    )
+    expect(g.edges.some((e) => e.source === "a" && e.target === "concepts/foo")).toBe(true)
+    expect(g.nodes.get("concepts/foo")?.degree).toBeGreaterThan(0)
   })
 
   it("creates a cites edge from sources frontmatter and carries confidence", () => {

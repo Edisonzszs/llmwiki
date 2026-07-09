@@ -1,4 +1,4 @@
-import { extractWikilinks } from "./graph.js"
+import { extractWikilinks, normalizeLinkTarget } from "./graph.js"
 import { sourceReferenceIdentity } from "./source-identity.js"
 import type { Graph, Page, SourceRef } from "./types.js"
 
@@ -52,7 +52,12 @@ export function extractFootnoteCitations(body: string): string[] {
 }
 
 function normalizeId(id: string): string {
-  return id.toLowerCase().replace(/\.md$/i, "")
+  return id.toLowerCase().replace(/^wiki\//, "").replace(/\.md$/i, "")
+}
+
+function basename(p: string): string {
+  const i = p.lastIndexOf("/")
+  return i >= 0 ? p.slice(i + 1) : p
 }
 
 export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): LintIssue[] {
@@ -65,6 +70,7 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
     if (!normalizedIndex.has(n)) normalizedIndex.set(n, p.id)
   }
   const sourceIds = new Set(sources.map((s) => s.id))
+  const sourceBasenames = new Set(sources.map((s) => basename(s.id)))
 
   for (const p of pages) {
     if (!p.fm) {
@@ -128,7 +134,8 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
 
     // related[] links: broken detection only (auto-fix of frontmatter lists is later).
     for (const target of p.fm.related ?? []) {
-      if (!knownPageIds.has(target)) {
+      const normalized = normalizeLinkTarget(target)
+      if (!knownPageIds.has(normalized)) {
         issues.push({
           pageId: p.id,
           severity: "warn",
@@ -140,7 +147,9 @@ export function lintPages(pages: Page[], sources: SourceRef[], graph: Graph): Li
     }
 
     for (const s of p.fm.sources ?? []) {
-      if (!sourceIds.has(s)) {
+      const present =
+        sourceIds.has(s) || sourceIds.has(sourceReferenceIdentity(s)) || sourceBasenames.has(basename(s))
+      if (!present) {
         issues.push({
           pageId: p.id,
           severity: "warn",

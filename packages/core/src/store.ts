@@ -194,5 +194,8 @@ function buildMatchExpression(query: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .map((t) => `"${t.replace(/"/g, '""')}"`)
-  return terms.join(" ")
+  // OR (not implicit AND): a natural-language query like "what is the difference
+  // between X and Y" would otherwise require every word — including stop words —
+  // to appear in a page, yielding zero results. OR gives recall; BM25 ranks.
+  return terms.join(" OR ")
 }
