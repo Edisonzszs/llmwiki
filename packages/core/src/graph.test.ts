@@ -90,6 +90,15 @@ describe("buildGraph", () => {
     expect(g.edges.some((e) => e.target === "concepts/knowledge-compounding")).toBe(true)
   })
 
+  it("resolves a link by slug-normalized form (Claude.ai -> claudeai, spaces/punct collapse)", () => {
+    const a = page("concepts/claudeai", "", { title: "Claude AI" })
+    const b = page("concepts/mcp-model-context-protocol", "", { title: "MCP" })
+    const ref = page("x", "uses [[Claude.ai]] and [[MCP (Model Context Protocol)]]", { title: "X" })
+    const g = buildGraph([a, b, ref], [])
+    expect(g.edges.some((e) => e.target === "concepts/claudeai")).toBe(true)
+    expect(g.edges.some((e) => e.target === "concepts/mcp-model-context-protocol")).toBe(true)
+  })
+
   it("creates a cites edge from sources frontmatter and carries confidence", () => {
     const src: SourceRef = { id: "ml/paper.pdf", path: "raw/sources/ml/paper.pdf", title: "Paper" }
     const g = buildGraph([page("a", "", { sources: ["ml/paper.pdf"], confidence: "EXTRACTED" })], [src])

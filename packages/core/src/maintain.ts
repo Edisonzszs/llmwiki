@@ -75,7 +75,7 @@ export function buildProposePrompt(gap: KnowledgeGap, neighborSnippets: string):
     ``,
     `## Output format (emit ONLY this block)`,
     `---FILE: ${fileDir}.md---`,
-    `<YAML frontmatter: type: concept, title, tags (>=2), related, sources, created, updated, confidence: INFERRED>`,
+    `<YAML frontmatter: type: concept, title: "${gap.target}", tags (>=2), related, sources, created, updated, confidence: INFERRED>`,
     `<short markdown body with [[wikilinks]]>`,
     `---END FILE---`,
     ``,
