@@ -14,7 +14,7 @@ const exists = (rel: string): Promise<boolean> =>
 
 describe("llmwiki-skill bundle", () => {
   it("ships a SKILL.md with the Skill frontmatter and the maintainer guide", async () => {
-    const skill = await fs.readFile(path.join(pkg, "SKILL.md"), "utf8")
+    const skill = (await fs.readFile(path.join(pkg, "SKILL.md"), "utf8")).replace(/\r\n/g, "\n")
     expect(skill.startsWith("---\n")).toBe(true)
     expect(skill).toContain("name: llm-wiki")
     expect(skill).toContain("description:")
