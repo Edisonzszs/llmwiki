@@ -2,6 +2,10 @@
 
 > Compile knowledge once, maintain it continuously.
 
+[![CI](https://github.com/Edisonzszs/llmwiki/actions/workflows/ci.yml/badge.svg)](https://github.com/Edisonzszs/llmwiki/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/llmwiki)](https://www.npmjs.com/package/llmwiki)
+[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
+
 A portable, headless **LLM Wiki** engine. Instead of re-deriving knowledge from
 raw documents on every query (RAG), an LLM incrementally builds and maintains a
 persistent, interlinked markdown knowledge base — so knowledge **compounds**:
@@ -65,7 +69,7 @@ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full module map.
 ## Develop
 
 ```bash
-git clone <repo> && cd llmwiki
+git clone https://github.com/Edisonzszs/llmwiki.git && cd llmwiki
 npm install
 npm test          # builds (tsc -b) then runs vitest
 npm run build     # compile all packages to dist/

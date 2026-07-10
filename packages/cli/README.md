@@ -52,6 +52,6 @@ Use `--mock` to exercise the full ingest→ask loop with a scripted LLM (no key)
 - [`llmwiki-mcp`](https://www.npmjs.com/package/llmwiki-mcp) — MCP server (drive from Claude Code / Codex).
 - [`llmwiki-skill`](https://www.npmjs.com/package/llmwiki-skill) — portable Skill bundle.
 
-Repo + architecture: see the [project README](https://github.com/llmwiki/llmwiki).
+Repo + architecture: see the [project README](https://github.com/Edisonzszs/llmwiki).
 
 MIT.
