@@ -1,5 +1,5 @@
 /**
- * @llmwiki/core — the headless LLM Wiki engine.
+ * llmwiki-core — the headless LLM Wiki engine.
  *
  * Pure deterministic logic (parse / graph / retrieval / lint / staleness /
  * health) plus pluggable LLM ops (two-step ingest, maintain). The deterministic

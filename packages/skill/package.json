@@ -1,5 +1,5 @@
 {
-  "name": "@llmwiki/skill",
+  "name": "llmwiki-skill",
   "version": "0.1.0",
   "description": "Portable Skill bundle for the LLM Wiki engine — install into Claude Code / Codex / any agent that supports the Skill standard.",
   "type": "module",

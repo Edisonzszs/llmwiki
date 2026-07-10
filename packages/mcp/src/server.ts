@@ -1,8 +1,8 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js"
-import { createWiki, createLlmClient, type LlmClient } from "@llmwiki/core"
+import { createWiki, createLlmClient, type LlmClient } from "llmwiki-core"
 import { TOOL_LIST, handleToolCall } from "./tools.js"
 
 /**

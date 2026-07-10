@@ -1,8 +1,8 @@
 {
-  "name": "llm-wiki",
+  "name": "llmwiki-workspace",
   "private": true,
   "version": "0.1.0",
-  "description": "A portable, headless LLM Wiki engine — compile knowledge once, maintain it continuously.",
+  "description": "A portable, headless LLM Wiki — compile knowledge once, maintain it continuously.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -13,10 +13,11 @@
     "apps/*"
   ],
   "scripts": {
+    "build": "tsc -b",
     "test": "vitest run",
+    "pretest": "tsc -b",
     "test:watch": "vitest",
-    "typecheck": "tsc -b",
-    "build": "tsc -b"
+    "typecheck": "tsc -b"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

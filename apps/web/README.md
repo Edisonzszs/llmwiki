@@ -1,4 +1,4 @@
-# @llmwiki/web — interface contract (M6, deferred)
+# llmwiki-web — interface contract (M6, deferred)
 
 > Status: **contract only.** The full web/graph UI is a separate, larger effort
 > and is intentionally not built here. This document fixes the contract any future
@@ -6,14 +6,14 @@
 
 ## Role
 
-A thin client over `createWiki` (from `@llmwiki/core`). The browser cannot import
+A thin client over `createWiki` (from `llmwiki-core`). The browser cannot import
 the Node core directly, so a small **local transport** exposes the `Wiki` handle;
 the UI is otherwise stateless and read-mostly.
 
 ## Transport (pick one at build time)
 
 - **Local HTTP/SSE server** (recommended for M6): a tiny Node server (could live
-  in `@llmwiki/cli serve` or a new `@llmwiki/server`) wrapping each `Wiki` method.
+  in `llmwiki serve` or a new `@llmwiki/server`) wrapping each `Wiki` method.
   Bind loopback only; protect with a local token (the reference projects do this).
 - **Tauri shell**: embed core in a desktop webview. Heavier; defer unless desktop
   packaging is required.

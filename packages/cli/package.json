@@ -1,16 +1,22 @@
 {
-  "name": "@llmwiki/cli",
+  "name": "llmwiki",
   "version": "0.1.0",
-  "description": "Thin CLI front for the LLM Wiki engine.",
+  "description": "A portable, headless LLM Wiki — compile knowledge once, maintain it continuously. CLI.",
   "type": "module",
   "license": "MIT",
+  "author": "llmwiki contributors",
   "bin": {
-    "llmwiki": "./src/cli.ts"
+    "llmwiki": "./dist/cli.js"
   },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc -b",
+    "prepublishOnly": "tsc -b",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmwiki/core": "*"
-  }
+    "llmwiki-core": "^0.1.0"
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["llm", "wiki", "knowledge-base", "rag", "karpathy", "markdown", "personal-knowledge", "memex", "second-brain", "cli"]
 }

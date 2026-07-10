@@ -1,0 +1,23 @@
+name: Bug report
+description: Report something that's broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce + expected vs actual. Include the command and output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: llmwiki version / commit
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Node + OS
+    validations:
+      required: true

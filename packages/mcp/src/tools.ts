@@ -1,4 +1,4 @@
-import type { Wiki } from "@llmwiki/core"
+import type { Wiki } from "llmwiki-core"
 
 /**
  * MCP tool definitions + a transport-agnostic handler. `handleToolCall` is pure

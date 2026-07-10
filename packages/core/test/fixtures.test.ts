@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { randomUUID } from "node:crypto"
-import { createWiki } from "@llmwiki/core"
+import { createWiki } from "llmwiki-core"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const fixtureSrc = path.join(here, "fixtures")

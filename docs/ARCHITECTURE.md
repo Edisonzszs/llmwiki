@@ -8,10 +8,10 @@ being re-derived per query (RAG).
 
 | Package | Role |
 | --- | --- |
-| `@llmwiki/core` | The engine — all real logic. Pure deterministic core + injected-LLM ops. |
-| `@llmwiki/cli` | Thin `llmwiki` CLI front. |
-| `@llmwiki/mcp` | MCP stdio server — drive the wiki from any MCP client. |
-| `@llmwiki/skill` | Portable Skill bundle (SKILL.md + templates) for agent hosts. |
+| `llmwiki-core` | The engine — all real logic. Pure deterministic core + injected-LLM ops. |
+| `llmwiki` | Thin `llmwiki` CLI front. |
+| `llmwiki-mcp` | MCP stdio server — drive the wiki from any MCP client. |
+| `llmwiki-skill` | Portable Skill bundle (SKILL.md + templates) for agent hosts. |
 | `apps/web` | (M6, deferred) web/graph UI. |
 
 ## Three load-bearing invariants

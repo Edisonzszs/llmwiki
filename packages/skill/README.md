@@ -1,4 +1,4 @@
-# @llmwiki/skill
+# llmwiki-skill
 
 A portable **Skill** bundle for the LLM Wiki engine. Install it into any agent
 that supports the Skill standard (Claude Code, Codex CLI, OpenCode, Hermes) and

@@ -1,6 +1,6 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 import { parseArgs } from "node:util"
-import { createWiki, createLlmClient, MockLlm, type LlmClient } from "@llmwiki/core"
+import { createWiki, createLlmClient, MockLlm, type LlmClient } from "llmwiki-core"
 
 /**
  * `llmwiki` — thin CLI front for the headless LLM Wiki engine.

@@ -1,23 +1,32 @@
 {
-  "name": "@llmwiki/mcp",
+  "name": "llmwiki-mcp",
   "version": "0.1.0",
-  "description": "MCP server front for the LLM Wiki engine — drive it from Claude Code / Codex / any MCP client.",
+  "description": "MCP server for the LLM Wiki engine — drive it from Claude Code / Codex / any MCP client.",
   "type": "module",
   "license": "MIT",
+  "author": "llmwiki contributors",
   "bin": {
-    "llmwiki-mcp": "./src/server.ts"
+    "llmwiki-mcp": "./dist/server.js"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
+  "files": ["dist"],
   "scripts": {
+    "build": "tsc -b",
+    "prepublishOnly": "tsc -b",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmwiki/core": "*",
+    "llmwiki-core": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.0.4"
-  }
+  },
+  "engines": { "node": ">=20" },
+  "keywords": ["llm", "wiki", "knowledge-base", "mcp", "model-context-protocol", "claude-code", "rag"]
 }

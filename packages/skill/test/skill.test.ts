@@ -12,7 +12,7 @@ const exists = (rel: string): Promise<boolean> =>
     () => false,
   )
 
-describe("@llmwiki/skill bundle", () => {
+describe("llmwiki-skill bundle", () => {
   it("ships a SKILL.md with the Skill frontmatter and the maintainer guide", async () => {
     const skill = await fs.readFile(path.join(pkg, "SKILL.md"), "utf8")
     expect(skill.startsWith("---\n")).toBe(true)

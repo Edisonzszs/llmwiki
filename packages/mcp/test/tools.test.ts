@@ -3,8 +3,8 @@ import { promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
-import { createWiki, type Wiki } from "@llmwiki/core"
-import { handleToolCall, TOOL_LIST } from "@llmwiki/mcp"
+import { createWiki, type Wiki } from "llmwiki-core"
+import { handleToolCall, TOOL_LIST } from "llmwiki-mcp"
 
 const tmpRoots: string[] = []
 async function freshKb(): Promise<string> {

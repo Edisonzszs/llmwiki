@@ -15,7 +15,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { createLlmClient, createWiki, type LlmClient, type Wiki } from "@llmwiki/core"
+import { createLlmClient, createWiki, type LlmClient, type Wiki } from "llmwiki-core"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 

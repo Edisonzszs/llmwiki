@@ -1,5 +1,5 @@
 {
-  "name": "@llmwiki/web",
+  "name": "llmwiki-web",
   "version": "0.1.0",
   "private": true,
   "description": "Web/graph UI for the LLM Wiki engine — local HTTP API over createWiki + a self-contained force-directed graph client.",
@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@llmwiki/core": "*"
+    "llmwiki-core": "*"
   },
   "devDependencies": {
     "tsx": "^4.19.2"
