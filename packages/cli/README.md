@@ -13,7 +13,7 @@ pattern, as a reusable engine. Bring your own key (any OpenAI-compatible endpoin
 ## Install
 
 ```bash
-npm install -g @edisonssszzz/llmwiki
+npm install -g llm-wiki-agent
 ```
 
 ## Quickstart
@@ -49,7 +49,7 @@ Use `--mock` to exercise the full ingest→ask loop with a scripted LLM (no key)
 ## Related packages
 
 - [`llmwiki-core`](https://www.npmjs.com/package/llmwiki-core) — the headless engine.
-- [`@edisonssszzz/llmwiki-mcp`](https://www.npmjs.com/package/@edisonssszzz/llmwiki-mcp) — MCP server (drive from Claude Code / Codex).
+- [`llm-wiki-agent-mcp`](https://www.npmjs.com/package/llm-wiki-agent-mcp) — MCP server (drive from Claude Code / Codex).
 - [`llmwiki-skill`](https://www.npmjs.com/package/llmwiki-skill) — portable Skill bundle.
 
 Repo + architecture: see the [project README](https://github.com/Edisonzszs/llmwiki).

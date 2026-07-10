@@ -3,7 +3,7 @@
 > Compile knowledge once, maintain it continuously.
 
 [![CI](https://github.com/Edisonzszs/llmwiki/actions/workflows/ci.yml/badge.svg)](https://github.com/Edisonzszs/llmwiki/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/@edisonssszzz/llmwiki)](https://www.npmjs.com/package/@edisonssszzz/llmwiki)
+[![npm](https://img.shields.io/npm/v/llm-wiki-agent)](https://www.npmjs.com/package/llm-wiki-agent)
 [![license](https://img.shields.io/badge/license-MIT-blue)](#license)
 
 A portable, headless **LLM Wiki** engine. Instead of re-deriving knowledge from
@@ -16,7 +16,7 @@ This is [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555
 pattern, built as a reusable engine — engine-first, model-agnostic, MIT.
 
 ```bash
-npm install -g @edisonssszzz/llmwiki
+npm install -g llm-wiki-agent
 llmwiki init
 llmwiki ingest ./paper.md            # two-step ingest → compiled, cross-linked pages
 llmwiki ask "what are the main claims?"
@@ -49,9 +49,9 @@ Three things the reference projects don't have:
 
 | Package | What it is |
 | --- | --- |
-| [`@edisonssszzz/llmwiki`](./packages/cli) | The `llmwiki` CLI. Install this. |
+| [`llm-wiki-agent`](./packages/cli) | The `llmwiki` CLI. Install this. |
 | [`llmwiki-core`](./packages/core) | The headless engine — deterministic pure functions + pluggable LLM ops. |
-| [`@edisonssszzz/llmwiki-mcp`](./packages/mcp) | MCP server — drive a wiki from Claude Code / Codex / any MCP client. |
+| [`llm-wiki-agent-mcp`](./packages/mcp) | MCP server — drive a wiki from Claude Code / Codex / any MCP client. |
 | [`llmwiki-skill`](./packages/skill) | Portable Skill bundle (SKILL.md + templates). |
 | [`llmwiki-web`](./apps/web) | Local web/graph UI (Canvas force-directed graph). |
 

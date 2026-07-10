@@ -1,5 +1,5 @@
 {
-  "name": "@edisonssszzz/llmwiki-mcp",
+  "name": "llm-wiki-agent-mcp",
   "version": "0.1.0",
   "description": "MCP server for the LLM Wiki engine — drive it from Claude Code / Codex / any MCP client.",
   "type": "module",

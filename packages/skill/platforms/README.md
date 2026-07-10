@@ -4,7 +4,7 @@ This package is a portable **Skill** (markdown + templates). It shells out to th
 `llmwiki` engine for logic, so install the engine first:
 
 ```bash
-npm install -g @edisonssszzz/llmwiki   # (or use via npx)
+npm install -g llm-wiki-agent   # (or use via npx)
 ```
 
 Then register the skill with your agent.

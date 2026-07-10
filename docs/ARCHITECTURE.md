@@ -9,8 +9,8 @@ being re-derived per query (RAG).
 | Package | Role |
 | --- | --- |
 | `llmwiki-core` | The engine — all real logic. Pure deterministic core + injected-LLM ops. |
-| `@edisonssszzz/llmwiki` | Thin `llmwiki` CLI front. |
-| `@edisonssszzz/llmwiki-mcp` | MCP stdio server — drive the wiki from any MCP client. |
+| `llm-wiki-agent` | Thin `llmwiki` CLI front. |
+| `llm-wiki-agent-mcp` | MCP stdio server — drive the wiki from any MCP client. |
 | `llmwiki-skill` | Portable Skill bundle (SKILL.md + templates) for agent hosts. |
 | `apps/web` | (M6, deferred) web/graph UI. |
 
