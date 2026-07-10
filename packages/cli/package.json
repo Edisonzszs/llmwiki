@@ -1,5 +1,5 @@
 {
-  "name": "llmwiki",
+  "name": "@edisonssszzz/llmwiki",
   "version": "0.1.0",
   "description": "A portable, headless LLM Wiki — compile knowledge once, maintain it continuously. CLI.",
   "type": "module",
