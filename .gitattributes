@@ -1,0 +1,18 @@
+# Normalize all text files to LF line endings on checkout (every platform).
+# Fixes CRLF-sensitive tests (e.g. SKILL.md frontmatter "---\n" check) on Windows CI.
+* text=auto eol=LF
+
+# Ensure these are always LF regardless of platform defaults
+*.ts   text eol=LF
+*.md   text eol=LF
+*.json text eol=LF
+*.yml  text eol=LF
+*.yaml text eol=LF
+*.sh   text eol=LF
+
+# Binary — never normalize
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
