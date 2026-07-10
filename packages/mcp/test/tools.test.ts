@@ -28,7 +28,10 @@ afterEach(async () => {
   )
 })
 
-const json = (r: { content: { text: string }[] }): unknown => JSON.parse(r.content[0]!.text)
+const json = (r: { content: { text: string }[]; isError?: boolean }): unknown => {
+  if (r.isError) throw new Error("tool error: " + r.content[0]!.text)
+  return JSON.parse(r.content[0]!.text)
+}
 
 describe("MCP tool handler (deterministic tools, no LLM)", () => {
   let wiki: Wiki
