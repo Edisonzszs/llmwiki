@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterAll, describe, expect, it } from "vitest"
 import { promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -13,7 +13,7 @@ async function freshKb(): Promise<string> {
   tmpRoots.push(dir)
   return dir
 }
-afterEach(async () => {
+afterAll(async () => {
   await Promise.all(
     tmpRoots.splice(0).map(async (d) => {
       for (let i = 0; i < 6; i++) {
