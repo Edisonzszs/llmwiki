@@ -4,7 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
 import { createWiki, type Wiki } from "llmwiki-core"
-import { handleToolCall, TOOL_LIST } from "llmwiki-mcp"
+import { handleToolCall, TOOL_LIST } from "llm-wiki-agent-mcp"
 
 const tmpRoots: string[] = []
 async function freshKb(): Promise<string> {
