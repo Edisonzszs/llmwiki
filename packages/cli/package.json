@@ -1,6 +1,6 @@
 {
   "name": "llm-wiki-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A portable, headless LLM Wiki — compile knowledge once, maintain it continuously. CLI.",
   "type": "module",
   "license": "MIT",
@@ -15,7 +15,7 @@
   "bin": {
     "llmwiki": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "web"],
   "scripts": {
     "build": "tsc -b",
     "prepublishOnly": "tsc -b",

@@ -12,14 +12,14 @@ being re-derived per query (RAG).
 | `llm-wiki-agent` | Thin `llmwiki` CLI front. |
 | `llm-wiki-agent-mcp` | MCP stdio server — drive the wiki from any MCP client. |
 | `llmwiki-skill` | Portable Skill bundle (SKILL.md + templates) for agent hosts. |
-| `apps/web` | (M6, deferred) web/graph UI. |
+| `apps/web` | web/graph UI dev source (shipped via the CLI's `serve` command). |
 
 ## Three load-bearing invariants
 
 1. **The graph is a *view* of `wiki/*.md`, never the source of truth.** It is
    rebuilt on demand; nobody edits it directly. Change structure → edit pages.
 2. **The deterministic core never imports an LLM client.** LLM ops
-   (`ingest-runner`, `runMaintenance`, `semantic-lint`) take an injected
+   (`ingest-runner`, `runMaintenance`) take an injected
    `LlmClient`; a canned `MockLlm` makes everything testable offline.
 3. **The filesystem is truth; `.llmwiki/` is disposable.** Delete the index,
    rebuild — the wiki is fully recovered from `raw/` + `wiki/`.

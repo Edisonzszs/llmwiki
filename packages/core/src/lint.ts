@@ -10,8 +10,8 @@ import type { Graph, Page, SourceRef } from "./types.js"
  * wikilinks, dangling sources, orphans. Normalizable links carry an autoFixable
  * `rewrite-wikilink` patch that {@link applyLintFixes} applies deterministically.
  *
- * Tier 2 (semantic judgments — contradictions, stale claims, suggestions) is
- * LLM-driven and added later via a `semantic-lint` module.
+ * Tier 2 (semantic judgments — contradictions, stale claims, suggestions) is a
+ * future LLM-driven addition; not yet implemented.
  */
 
 export type LintSeverity = "error" | "warn" | "info"

@@ -23,7 +23,11 @@ llmwiki ask "what are the main claims?"
 llmwiki lint --fix                   # deterministic hygiene
 llmwiki maintain                     # fill knowledge gaps, refresh stale pages
 llmwiki health                       # is the wiki compounding?
+llmwiki serve                        # open the local web/graph UI → http://127.0.0.1:8765
 ```
+
+> No API key yet? `ingest`/`ask`/`maintain` need a model — pass `--mock` to run
+> the whole loop with a scripted LLM, or `--provider/--model/--api-key` for real.
 
 Any OpenAI-compatible endpoint works (OpenAI, **DeepSeek**, Ollama, OpenRouter)
 or Anthropic — bring your own key:
@@ -42,8 +46,9 @@ Three things the reference projects don't have:
   No external scheduled routine required; `--auto` gates on accumulated signal.
 - **Quality evals** — `health` turns "is my wiki compounding?" into a number
   (coverage / citation density / freshness / orphan-free / connectivity).
-- **Hybrid retrieval by default** — BM25 + optional vectors (RRF) + 1-hop graph
-  expansion, at all scales. CJK content is first-class (trigram index).
+- **Hybrid retrieval by default** — BM25 + 1-hop graph expansion, with a
+  pluggable vector interface (bring your own embedder). CJK content is
+  first-class (trigram index).
 
 ## Packages
 

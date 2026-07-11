@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util"
 import { createWiki, createLlmClient, MockLlm, type LlmClient } from "llmwiki-core"
+import { serveWiki } from "./serve.js"
 
 /**
  * `llmwiki` — thin CLI front for the headless LLM Wiki engine.
@@ -72,14 +73,21 @@ async function main(): Promise<void> {
       json: { type: "boolean", default: false },
       fix: { type: "boolean", default: false },
       auto: { type: "boolean", default: false },
+      help: { type: "boolean", default: false },
+      port: { type: "string", default: "8765" },
       limit: { type: "string", default: "10" },
     },
   })
 
+  if (flags.help || !positionals[0] || positionals[0] === "help") {
+    printHelp()
+    return
+  }
   const command = positionals[0]
   const root = String(flags.root)
   const llm = buildLlm(flags)
   const wiki = createWiki(root, { llm })
+  let keepAlive = false
 
   try {
     switch (command) {
@@ -184,14 +192,51 @@ async function main(): Promise<void> {
         } else throw new Error("usage: llmwiki index rebuild")
         break
       }
+      case "serve": {
+        serveWiki(wiki, root, Number(flags.port))
+        keepAlive = true // the HTTP server keeps the process alive; don't close the wiki
+        break
+      }
       default:
-        throw new Error(
-          "commands: init | ingest <path> | ask <q> | search <q> | lint [--fix] | list | read <id> | graph | impact <id> | insights | index rebuild",
-        )
+        printHelp()
     }
   } finally {
-    wiki.close()
+    if (!keepAlive) wiki.close()
   }
+}
+
+const HELP = `llmwiki — compile knowledge once, maintain it continuously.
+
+Usage: llmwiki [flags] <command> [args]
+
+Commands:
+  init                       scaffold a knowledge base in --root
+  ingest <path|url>          two-step ingest → compiled, cross-linked pages
+  ask <question>             retrieval + synthesis, cited [[like-this]]
+  search <query>             hybrid BM25 + graph search
+  read <id>                  print a page
+  list                       list pages
+  lint [--fix]               two-tier lint; --fix applies deterministic repairs
+  maintain [--auto]          fill knowledge gaps, refresh stale pages
+  health                     quality scorecard (is the wiki compounding?)
+  graph                      graph summary (nodes/edges)
+  impact <id>                pages that reference <id> (would go stale)
+  insights                   knowledge gaps, hubs, connected components
+  serve [--port 8765]        launch the local web/graph UI
+  index rebuild              regenerate the derived .llmwiki index
+
+Flags:
+  --root <dir>               knowledge base root (default: cwd)
+  --provider mock|openai|anthropic   BYOK model for ingest/ask/maintain
+  --model <id> --api-key <k> --base-url <u>
+  --mock                     scripted LLM (no key) — try the full loop instantly
+  --json                     machine-readable output (search/lint/list/graph)
+
+Deterministic commands (init/list/read/search/graph/lint/health/insights/impact)
+work with NO model. ingest/ask/maintain need --provider/--model/--api-key or --mock.`
+
+function printHelp(): void {
+  console.log(HELP)
 }
 
 main().catch((err: Error) => {
